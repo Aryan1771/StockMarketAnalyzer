@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import PriceChart from "../components/PriceChart.jsx";
 import SearchBar from "../components/SearchBar.jsx";
 import { ErrorMessage, LoadingCard } from "../components/State.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../services/api.js";
 
 const ranges = ["10d", "1mo", "3mo", "6mo", "1y"];
@@ -11,16 +12,19 @@ const ranges = ["10d", "1mo", "3mo", "6mo", "1y"];
 export default function StockDetails() {
   const { symbol = "AAPL" } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [range, setRange] = useState("1mo");
   const [quote, setQuote] = useState(null);
   const [history, setHistory] = useState([]);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     setError("");
+    setMessage("");
     Promise.all([api.quote(symbol), api.history(symbol, range), api.analysis(symbol, "10d")])
       .then(([quotePayload, historyPayload, analysisPayload]) => {
         setQuote(quotePayload.data);
@@ -33,6 +37,22 @@ export default function StockDetails() {
 
   const metrics = useMemo(() => analysis?.analysis?.metrics || {}, [analysis]);
 
+  const addToWatchlist = async () => {
+    setError("");
+    setMessage("");
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+
+    try {
+      await api.addWatchlist(symbol);
+      setMessage(`${symbol.toUpperCase()} added to your watchlist.`);
+    } catch (exc) {
+      setError(exc.message);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-[1fr_340px] lg:items-end">
@@ -44,10 +64,11 @@ export default function StockDetails() {
           <SearchBar onSelect={(nextSymbol) => navigate(`/stocks/${nextSymbol}`)} />
         </div>
         <div className="flex justify-start lg:justify-end">
-          <button className="btn" onClick={() => api.addWatchlist(symbol)}><Plus size={18} /> Add to watchlist</button>
+          <button className="btn" onClick={addToWatchlist}><Plus size={18} /> Add to watchlist</button>
         </div>
       </div>
       <ErrorMessage message={error} />
+      {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950">{message}</div>}
       {loading ? <LoadingCard lines={5} /> : quote && (
         <>
           <div className="grid gap-4 md:grid-cols-4">

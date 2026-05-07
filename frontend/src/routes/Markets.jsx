@@ -19,6 +19,12 @@ export default function Markets() {
   const loadMoreRef = useRef(null);
   const rowRefs = useRef(new Map());
   const visibleIndicesRef = useRef(new Set());
+  const quoteMapRef = useRef({});
+  const requestedSymbolsRef = useRef(new Set());
+
+  useEffect(() => {
+    quoteMapRef.current = quoteMap;
+  }, [quoteMap]);
 
   useEffect(() => {
     api.catalog()
@@ -59,8 +65,10 @@ export default function Markets() {
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
     setQuoteMap({});
+    quoteMapRef.current = {};
     setError("");
     visibleIndicesRef.current = new Set();
+    requestedSymbolsRef.current = new Set();
     setActiveRange({ start: 0, end: PAGE_SIZE - 1 });
   }, [selectedId, filter]);
 
@@ -126,6 +134,8 @@ export default function Markets() {
   useEffect(() => {
     if (!visibleStocks.length) {
       setQuoteMap({});
+      quoteMapRef.current = {};
+      requestedSymbolsRef.current = new Set();
       return;
     }
 
@@ -133,6 +143,7 @@ export default function Markets() {
     const bufferEnd = Math.min(visibleStocks.length - 1, activeRange.end + QUOTE_BUFFER);
     const windowStocks = visibleStocks.slice(bufferStart, bufferEnd + 1);
     const windowSymbols = new Set(windowStocks.map((stock) => stock.symbol).filter(Boolean));
+    const previousWindowQuotes = quoteMapRef.current;
 
     setQuoteMap((current) => {
       const next = {};
@@ -141,18 +152,32 @@ export default function Markets() {
           next[symbol] = quote;
         }
       }
+      const sameSize = Object.keys(next).length === Object.keys(current).length;
+      if (sameSize && Object.keys(current).every((symbol) => next[symbol] === current[symbol])) {
+        return current;
+      }
+      quoteMapRef.current = next;
       return next;
     });
 
+    requestedSymbolsRef.current = new Set(
+      [...requestedSymbolsRef.current].filter((symbol) => windowSymbols.has(symbol))
+    );
+
     const symbolsToFetch = windowStocks
       .map((stock) => stock.symbol)
-      .filter((symbol) => symbol && !quoteMap[symbol]);
+      .filter((symbol) =>
+        symbol &&
+        !previousWindowQuotes[symbol] &&
+        !requestedSymbolsRef.current.has(symbol)
+      );
 
     if (!symbolsToFetch.length) {
       return;
     }
 
     let cancelled = false;
+    symbolsToFetch.forEach((symbol) => requestedSymbolsRef.current.add(symbol));
     setQuoteLoading(true);
     api.compare(symbolsToFetch)
       .then((payload) => {
@@ -172,8 +197,11 @@ export default function Markets() {
               trimmed[symbol] = quote;
             }
           }
-          return { ...trimmed, ...nextQuotes };
+          const merged = { ...trimmed, ...nextQuotes };
+          quoteMapRef.current = merged;
+          return merged;
         });
+        setError("");
       })
       .catch(() => {
         if (!cancelled) {
@@ -182,6 +210,7 @@ export default function Markets() {
       })
       .finally(() => {
         if (!cancelled) {
+          symbolsToFetch.forEach((symbol) => requestedSymbolsRef.current.delete(symbol));
           setQuoteLoading(false);
         }
       });
@@ -189,7 +218,7 @@ export default function Markets() {
     return () => {
       cancelled = true;
     };
-  }, [activeRange, visibleStocks, quoteMap]);
+  }, [activeRange, visibleStocks]);
 
   return (
     <div className="space-y-6">

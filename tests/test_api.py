@@ -10,6 +10,7 @@ sys.path.insert(0, str(API_DIR))
 
 from app import create_app
 from config import PREFERENCES_FILE, USERS_FILE, WATCHLIST_FILE
+from run_cpp import run_cpp_analysis
 from services.cache_service import cache
 from services.dashboard_service import dashboard_service
 from services.news_service import news_service
@@ -265,6 +266,22 @@ def test_news_general_falls_back_to_symbol_basket(monkeypatch):
     assert payload["data"]
     assert payload["data"][0]["provider"] == "finnhub"
     assert payload["data"][0]["url"].startswith("https://example.com/")
+
+
+def test_cpp_analysis_falls_back_to_python_metrics(monkeypatch):
+    monkeypatch.setattr("run_cpp._supports_native_cpp", lambda: False)
+
+    payload = run_cpp_analysis([
+        {"date": "2026-05-01", "open": 10, "high": 11, "low": 9, "close": 10, "volume": 100},
+        {"date": "2026-05-02", "open": 11, "high": 12, "low": 10, "close": 11, "volume": 120},
+        {"date": "2026-05-03", "open": 12, "high": 13, "low": 11, "close": 12, "volume": 140},
+        {"date": "2026-05-04", "open": 11, "high": 13, "low": 10, "close": 11, "volume": 150},
+        {"date": "2026-05-05", "open": 13, "high": 14, "low": 12, "close": 13, "volume": 160},
+    ])
+
+    assert payload["fallback"] == "python"
+    assert payload["metrics"]["moving_average"] == 11.4
+    assert payload["metrics"]["stock_span"] == 5
 
 
 def _read_json(path):
