@@ -4,8 +4,6 @@ import { ErrorMessage, LoadingCard } from "../components/State.jsx";
 import { api } from "../services/api.js";
 
 const PAGE_SIZE = 20;
-const QUOTE_BUFFER = 5;
-
 export default function Markets() {
   const [catalog, setCatalog] = useState([]);
   const [selectedId, setSelectedId] = useState("sp500");
@@ -15,10 +13,7 @@ export default function Markets() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [error, setError] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [activeRange, setActiveRange] = useState({ start: 0, end: PAGE_SIZE - 1 });
   const loadMoreRef = useRef(null);
-  const rowRefs = useRef(new Map());
-  const visibleIndicesRef = useRef(new Set());
   const quoteMapRef = useRef({});
   const requestedSymbolsRef = useRef(new Set());
 
@@ -67,9 +62,7 @@ export default function Markets() {
     setQuoteMap({});
     quoteMapRef.current = {};
     setError("");
-    visibleIndicesRef.current = new Set();
     requestedSymbolsRef.current = new Set();
-    setActiveRange({ start: 0, end: PAGE_SIZE - 1 });
   }, [selectedId, filter]);
 
   useEffect(() => {
@@ -94,54 +87,12 @@ export default function Markets() {
   useEffect(() => {
     if (!visibleStocks.length) {
       setQuoteMap({});
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const index = Number(entry.target.getAttribute("data-index"));
-          if (Number.isNaN(index)) {
-            continue;
-          }
-          if (entry.isIntersecting) {
-            visibleIndicesRef.current.add(index);
-          } else {
-            visibleIndicesRef.current.delete(index);
-          }
-        }
-
-        const indices = [...visibleIndicesRef.current].sort((a, b) => a - b);
-        if (indices.length) {
-          setActiveRange({ start: indices[0], end: indices[indices.length - 1] });
-        }
-      },
-      {
-        threshold: 0.2,
-        rootMargin: "120px 0px",
-      }
-    );
-
-    for (const [index, node] of rowRefs.current.entries()) {
-      if (index < visibleStocks.length && node) {
-        observer.observe(node);
-      }
-    }
-
-    return () => observer.disconnect();
-  }, [visibleStocks]);
-
-  useEffect(() => {
-    if (!visibleStocks.length) {
-      setQuoteMap({});
       quoteMapRef.current = {};
       requestedSymbolsRef.current = new Set();
       return;
     }
 
-    const bufferStart = Math.max(0, activeRange.start - QUOTE_BUFFER);
-    const bufferEnd = Math.min(visibleStocks.length - 1, activeRange.end + QUOTE_BUFFER);
-    const windowStocks = visibleStocks.slice(bufferStart, bufferEnd + 1);
+    const windowStocks = visibleStocks;
     const windowSymbols = new Set(windowStocks.map((stock) => stock.symbol).filter(Boolean));
     const previousWindowQuotes = quoteMapRef.current;
 
@@ -218,7 +169,7 @@ export default function Markets() {
     return () => {
       cancelled = true;
     };
-  }, [activeRange, visibleStocks]);
+  }, [visibleStocks]);
 
   return (
     <div className="space-y-6">
@@ -301,14 +252,6 @@ export default function Markets() {
                       <Link
                         key={`${stock.symbol}-${index}`}
                         to={`/stocks/${encodeURIComponent(stock.symbol)}`}
-                        data-index={index}
-                        ref={(node) => {
-                          if (node) {
-                            rowRefs.current.set(index, node);
-                          } else {
-                            rowRefs.current.delete(index);
-                          }
-                        }}
                         className="grid grid-cols-[1.1fr_2fr_1.2fr_1fr_1fr] gap-3 px-5 py-3 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
                       >
                         <div className="font-semibold">{stock.displaySymbol || stock.symbol}</div>
