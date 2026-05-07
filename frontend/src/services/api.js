@@ -14,6 +14,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  baseUrl: API_BASE,
   dashboard: () => request("/api/stocks/dashboard"),
   overview: () => request("/api/stocks/overview"),
   catalog: () => request("/api/stocks/catalog"),
@@ -48,6 +49,7 @@ export const api = {
   }),
   logout: () => request("/api/user/logout", { method: "POST" }),
   apiKeyStatus: () => request("/api/user/api-keys/status"),
+  oauthProviders: () => request("/api/user/oauth/providers"),
   legacyAnalyze: (symbol) => request("/analyze", {
     method: "POST",
     body: JSON.stringify({ symbol })

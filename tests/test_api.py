@@ -48,7 +48,7 @@ def test_watchlist_add_remove():
     client = app.test_client()
     try:
         username = f"user_{uuid.uuid4().hex[:8]}"
-        register_response = client.post("/api/user/register", json={"username": username, "password": "secret12", "displayName": "Test User"})
+        register_response = client.post("/api/user/register", json={"username": username, "password": "Secret12", "displayName": "Test User"})
         assert register_response.status_code == 201
 
         add_response = client.post("/api/watchlist", json={"symbol": "IBM"})
@@ -78,7 +78,7 @@ def test_register_login_logout_flow():
     try:
         register_response = client.post("/api/user/register", json={
             "username": username,
-            "password": "secret12",
+            "password": "Secret12",
             "displayName": "A Test User",
         })
         assert register_response.status_code == 201
@@ -95,7 +95,7 @@ def test_register_login_logout_flow():
         after_logout = client.get("/api/user/me")
         assert after_logout.get_json()["authenticated"] is False
 
-        login_response = client.post("/api/user/login", json={"username": username, "password": "secret12"})
+        login_response = client.post("/api/user/login", json={"username": username, "password": "Secret12"})
         assert login_response.status_code == 200
         assert login_response.get_json()["user"]["displayName"] == "A Test User"
     finally:

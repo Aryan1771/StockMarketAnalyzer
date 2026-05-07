@@ -18,6 +18,11 @@ export function AuthProvider({ children }) {
     user,
     loading,
     isAuthenticated: Boolean(user),
+    async refresh() {
+      const payload = await api.me();
+      setUser(payload.user);
+      return payload.user;
+    },
     async login(payload) {
       const response = await api.login(payload);
       setUser(response.user);

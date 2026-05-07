@@ -1,5 +1,6 @@
-import { BarChart3, Bell, BriefcaseBusiness, Home, LogIn, LogOut, Moon, Search, Settings, Star, Sun, UserCircle2 } from "lucide-react";
+import { BarChart3, Bell, BriefcaseBusiness, DoorOpen, Home, LogIn, Moon, Settings, Star, Sun, UserCircle2 } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import BrandMark from "./BrandMark.jsx";
 import SearchBar from "./SearchBar.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -30,9 +31,7 @@ export default function Layout({ children, theme, onThemeChange }) {
     <div className="min-h-screen lg:grid lg:grid-cols-[250px_1fr]">
       <aside className="hidden border-r border-slate-200 bg-white px-4 py-5 dark:border-slate-800 dark:bg-slate-900 lg:block">
         <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-white">
-            <Search size={20} />
-          </div>
+          <BrandMark size={40} />
           <div>
             <p className="text-sm font-bold">StockMarketAnalyzer</p>
             <p className="muted">Signals and research</p>
@@ -68,7 +67,7 @@ export default function Layout({ children, theme, onThemeChange }) {
                       <span>{user.displayName || user.username}</span>
                     </div>
                     <button className="btn-secondary inline-flex items-center gap-2" onClick={handleLogout}>
-                      <LogOut size={16} />
+                      <DoorOpen size={16} />
                       Logout
                     </button>
                   </>
@@ -89,7 +88,7 @@ export default function Layout({ children, theme, onThemeChange }) {
               <div className="md:hidden">
                 {isAuthenticated ? (
                   <button className="rounded-md border border-slate-200 p-2 dark:border-slate-700" onClick={handleLogout} title="Logout">
-                    <LogOut size={18} />
+                    <DoorOpen size={18} />
                   </button>
                 ) : (
                   <button className="rounded-md border border-slate-200 p-2 dark:border-slate-700" onClick={() => navigate("/auth")} title="Login">
