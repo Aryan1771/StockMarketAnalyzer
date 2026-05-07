@@ -79,12 +79,10 @@ export default function Settings({ theme, onThemeChange }) {
       </div>
       <div className="card">
         <h2 className="text-xl font-bold">API Provider Status</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
           <Provider label="Yahoo Finance" enabled={keys.yahooFinance} />
           <Provider label="Alpha Vantage" enabled={keys.alphaVantage} />
           <Provider label="Finnhub" enabled={keys.finnhub} />
-          <Provider label="Google OAuth" enabled={keys.oauth?.google} />
-          <Provider label="Outlook OAuth" enabled={keys.oauth?.microsoft} />
         </div>
         <p className="muted mt-4">
           All external provider keys are loaded from environment variables when the Flask API starts.
@@ -103,19 +101,9 @@ export default function Settings({ theme, onThemeChange }) {
           <span className="font-medium text-slate-700 dark:text-slate-200"> SECRET_KEY </span>,
           <span className="font-medium text-slate-700 dark:text-slate-200"> PASSWORD_SALT </span>,
           <span className="font-medium text-slate-700 dark:text-slate-200"> FRONTEND_ORIGINS </span>,
-          <span className="font-medium text-slate-700 dark:text-slate-200"> FRONTEND_APP_URL </span>,
           <span className="font-medium text-slate-700 dark:text-slate-200"> SESSION_COOKIE_SECURE </span>,
           and
           <span className="font-medium text-slate-700 dark:text-slate-200"> SESSION_COOKIE_SAMESITE </span>.
-        </p>
-        <p className="muted mt-2">
-          Social sign-in also needs
-          <span className="font-medium text-slate-700 dark:text-slate-200"> GOOGLE_CLIENT_ID </span>,
-          <span className="font-medium text-slate-700 dark:text-slate-200"> GOOGLE_CLIENT_SECRET </span>,
-          <span className="font-medium text-slate-700 dark:text-slate-200"> MICROSOFT_CLIENT_ID </span>,
-          <span className="font-medium text-slate-700 dark:text-slate-200"> MICROSOFT_CLIENT_SECRET </span>,
-          and optionally
-          <span className="font-medium text-slate-700 dark:text-slate-200"> MICROSOFT_TENANT_ID </span>.
         </p>
       </div>
     </div>

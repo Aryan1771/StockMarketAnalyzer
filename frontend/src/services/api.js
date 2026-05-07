@@ -49,7 +49,6 @@ export const api = {
   }),
   logout: () => request("/api/user/logout", { method: "POST" }),
   apiKeyStatus: () => request("/api/user/api-keys/status"),
-  oauthProviders: () => request("/api/user/oauth/providers"),
   legacyAnalyze: (symbol) => request("/analyze", {
     method: "POST",
     body: JSON.stringify({ symbol })

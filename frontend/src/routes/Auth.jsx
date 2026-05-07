@@ -1,19 +1,16 @@
-import { Check, Mail, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Check } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorMessage } from "../components/State.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { api } from "../services/api.js";
 
 export default function Auth() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { login, register, refresh, isAuthenticated, user } = useAuth();
+  const { login, register, isAuthenticated, user } = useAuth();
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ username: "", password: "", displayName: "" });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [oauth, setOauth] = useState({ google: false, microsoft: false });
 
   const passwordChecks = useMemo(() => ([
     { label: "At least 8 characters", valid: form.password.length >= 8 },
@@ -22,30 +19,6 @@ export default function Auth() {
     { label: "At least 1 number", valid: /\d/.test(form.password) },
   ]), [form.password]);
   const passwordValid = passwordChecks.every((item) => item.valid);
-
-  useEffect(() => {
-    api.oauthProviders().then(setOauth).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const oauthStatus = searchParams.get("oauth");
-    if (!oauthStatus) {
-      return;
-    }
-    if (oauthStatus === "success") {
-      refresh()
-        .then(() => {
-          setMessage("Signed in successfully.");
-          navigate("/watchlist", { replace: true });
-        })
-        .catch(() => setError("Sign-in completed, but the session could not be refreshed."));
-    } else if (oauthStatus === "error") {
-      setError("Social sign-in could not be completed. Please try again.");
-    }
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete("oauth");
-    setSearchParams(nextParams, { replace: true });
-  }, [navigate, refresh, searchParams, setSearchParams]);
 
   if (isAuthenticated) {
     return (
@@ -82,10 +55,6 @@ export default function Auth() {
     }
   };
 
-  const beginOauth = (provider) => {
-    window.location.href = `${api.baseUrl}/api/user/oauth/${provider}/start?next=/watchlist`;
-  };
-
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <section>
@@ -111,34 +80,6 @@ export default function Auth() {
         </div>
         <ErrorMessage message={error} />
         {message && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950">{message}</div>}
-        <div className="grid gap-3 md:grid-cols-2">
-          <button
-            type="button"
-            className="btn-secondary justify-center"
-            onClick={() => beginOauth("google")}
-            disabled={!oauth.google}
-            title={oauth.google ? "Continue with Google" : "Google sign-in is not configured"}
-          >
-            <Mail size={16} />
-            {mode === "login" ? "Sign in with Google" : "Sign up with Google"}
-          </button>
-          <button
-            type="button"
-            className="btn-secondary justify-center"
-            onClick={() => beginOauth("microsoft")}
-            disabled={!oauth.microsoft}
-            title={oauth.microsoft ? "Continue with Outlook" : "Outlook sign-in is not configured"}
-          >
-            <ShieldCheck size={16} />
-            {mode === "login" ? "Sign in with Outlook" : "Sign up with Outlook"}
-          </button>
-        </div>
-        <div className="relative py-2">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-700" /></div>
-          <div className="relative flex justify-center text-xs uppercase tracking-wide text-slate-500">
-            <span className="bg-white px-3 dark:bg-slate-900">or use your account</span>
-          </div>
-        </div>
         <form className="space-y-4" onSubmit={submit}>
           {mode === "register" && (
             <label className="block">
