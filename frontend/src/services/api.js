@@ -48,6 +48,7 @@ export const api = {
     body: JSON.stringify(payload)
   }),
   logout: () => request("/api/user/logout", { method: "POST" }),
+  deleteAccount: () => request("/api/user/account", { method: "DELETE" }),
   apiKeyStatus: () => request("/api/user/api-keys/status"),
   legacyAnalyze: (symbol) => request("/analyze", {
     method: "POST",

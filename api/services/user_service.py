@@ -125,6 +125,21 @@ class UserService:
             user = self._find_user(self._load_users(), username)
         return self._public_user(user) if user else None
 
+    def delete_user(self, username):
+        username = self._normalize_username(username)
+        if db_service.enabled:
+            result = db_service.users().delete_one({"username": username})
+            if not result.deleted_count:
+                raise ValueError("User not found")
+            return {"deleted": True}
+
+        users = self._load_users()
+        next_users = [user for user in users if user.get("username") != username]
+        if len(next_users) == len(users):
+            raise ValueError("User not found")
+        self._save_users(next_users)
+        return {"deleted": True}
+
     def get_preferences(self, username=None):
         if username:
             username = self._normalize_username(username)

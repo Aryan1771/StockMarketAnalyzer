@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ErrorMessage } from "../components/State.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../services/api.js";
 
 export default function Settings({ theme, onThemeChange }) {
-  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout, deleteAccount } = useAuth();
   const [prefs, setPrefs] = useState({ theme, defaultRange: "1mo", refreshInterval: 60 });
   const [keys, setKeys] = useState({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getPreferences(), api.apiKeyStatus()])
@@ -27,6 +29,24 @@ export default function Settings({ theme, onThemeChange }) {
     setPrefs(saved);
     onThemeChange(saved.theme);
     setMessage("Preferences saved.");
+  };
+
+  const removeAccount = async () => {
+    const confirmed = window.confirm("Delete your account and all saved preferences/watchlist data?");
+    if (!confirmed) {
+      return;
+    }
+    setDeleting(true);
+    setError("");
+    setMessage("");
+    try {
+      await deleteAccount();
+      navigate("/auth");
+    } catch (exc) {
+      setError(exc.message);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -68,7 +88,17 @@ export default function Settings({ theme, onThemeChange }) {
             <p className="text-sm text-slate-600 dark:text-slate-300">
               Signed in as <span className="font-semibold">{user.displayName}</span> (@{user.username})
             </p>
-            <button className="btn-secondary w-full sm:w-auto" onClick={() => logout()}>Logout</button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button className="btn-secondary w-full sm:w-auto" onClick={() => logout()}>Logout</button>
+              <button
+                className="inline-flex w-full items-center justify-center rounded-md border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:hover:bg-rose-950 sm:w-auto"
+                onClick={removeAccount}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete account"}
+              </button>
+            </div>
+            <p className="muted">Deleting your account removes your saved preferences and watchlist data.</p>
           </>
         ) : (
           <>

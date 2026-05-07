@@ -38,6 +38,19 @@ def logout():
     return jsonify({"ok": True})
 
 
+@user_routes.route("/account", methods=["DELETE"])
+def delete_account():
+    username = session.get("username")
+    if not username:
+        return jsonify({"error": "Login required"}), 401
+    try:
+        result = user_service.delete_user(username)
+        session.clear()
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+
+
 @user_routes.route("/me", methods=["GET"])
 def me():
     username = session.get("username")

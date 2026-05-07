@@ -104,6 +104,32 @@ def test_register_login_logout_flow():
         _write_json(USERS_FILE, original_users)
 
 
+def test_delete_account_flow():
+    original_users = _read_json(USERS_FILE)
+    app = create_app()
+    client = app.test_client()
+    username = f"user_{uuid.uuid4().hex[:8]}"
+    try:
+        register_response = client.post("/api/user/register", json={
+            "username": username,
+            "password": "Secret12",
+            "displayName": "Delete Me",
+        })
+        assert register_response.status_code == 201
+
+        delete_response = client.delete("/api/user/account")
+        assert delete_response.status_code == 200
+        assert delete_response.get_json()["deleted"] is True
+
+        me_response = client.get("/api/user/me")
+        assert me_response.get_json()["authenticated"] is False
+
+        login_response = client.post("/api/user/login", json={"username": username, "password": "Secret12"})
+        assert login_response.status_code == 401
+    finally:
+        _write_json(USERS_FILE, original_users)
+
+
 def test_logged_in_data_persists_through_mongodb_path(monkeypatch):
     original_enabled = user_db_service.enabled
     original_users_method = user_db_service.users
@@ -141,6 +167,35 @@ def test_logged_in_data_persists_through_mongodb_path(monkeypatch):
         assert document["preferences"]["theme"] == "light"
         assert document["preferences"]["defaultRange"] == "3mo"
         assert "IBM" in document["watchlist"]
+    finally:
+        monkeypatch.setattr(user_db_service, "enabled", original_enabled)
+        monkeypatch.setattr(user_db_service, "users", original_users_method)
+
+
+def test_delete_account_through_mongodb_path(monkeypatch):
+    original_enabled = user_db_service.enabled
+    original_users_method = user_db_service.users
+    fake_collection = FakeMongoCollection()
+
+    monkeypatch.setattr(user_db_service, "enabled", True)
+    monkeypatch.setattr(user_db_service, "users", lambda: fake_collection)
+
+    app = create_app()
+    client = app.test_client()
+    username = f"user_{uuid.uuid4().hex[:8]}"
+
+    try:
+        register_response = client.post("/api/user/register", json={
+            "username": username,
+            "password": "Secret12",
+            "displayName": "Mongo Delete User",
+        })
+        assert register_response.status_code == 201
+        assert fake_collection.find_one({"username": username}) is not None
+
+        delete_response = client.delete("/api/user/account")
+        assert delete_response.status_code == 200
+        assert fake_collection.find_one({"username": username}) is None
     finally:
         monkeypatch.setattr(user_db_service, "enabled", original_enabled)
         monkeypatch.setattr(user_db_service, "users", original_users_method)
@@ -213,6 +268,13 @@ class FakeMongoCollection:
     def delete_many(self, _query):
         self.docs = []
 
+    def delete_one(self, query):
+        for index, doc in enumerate(self.docs):
+            if self._matches(doc, query):
+                del self.docs[index]
+                return FakeDeleteResult(1)
+        return FakeDeleteResult(0)
+
     def insert_many(self, docs):
         for doc in docs:
             self.insert_one(doc)
@@ -252,3 +314,8 @@ class FakeMongoCollection:
 class FakeUpdateResult:
     def __init__(self, matched_count):
         self.matched_count = matched_count
+
+
+class FakeDeleteResult:
+    def __init__(self, deleted_count):
+        self.deleted_count = deleted_count
