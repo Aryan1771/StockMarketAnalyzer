@@ -10,7 +10,9 @@ sys.path.insert(0, str(API_DIR))
 
 from app import create_app
 from config import PREFERENCES_FILE, USERS_FILE, WATCHLIST_FILE
+from services.cache_service import cache
 from services.dashboard_service import dashboard_service
+from services.news_service import news_service
 from services.user_service import db_service as user_db_service
 
 
@@ -226,6 +228,43 @@ def test_dashboard_route(monkeypatch):
     assert response.status_code == 200
     payload = response.get_json()
     assert set(payload["regions"].keys()) == {"india", "us"}
+
+
+def test_news_general_falls_back_to_symbol_basket(monkeypatch):
+    cache.clear()
+
+    class EmptyGeneralProvider:
+        def enabled(self):
+            return True
+
+        def news(self, symbol=None, category="general"):
+            if symbol:
+                return [{
+                    "id": f"{symbol}-1",
+                    "headline": f"{symbol} update",
+                    "summary": "Live market story",
+                    "source": "Provider Desk",
+                    "url": f"https://example.com/{symbol.lower()}",
+                    "datetime": 1778153232,
+                }]
+            return []
+
+    class DisabledProvider:
+        def enabled(self):
+            return False
+
+        def news(self, symbol=None, category="general"):
+            return []
+
+    monkeypatch.setattr(news_service, "finnhub", EmptyGeneralProvider())
+    monkeypatch.setattr(news_service, "alpha_vantage", DisabledProvider())
+
+    payload = news_service.get_news(symbol=None, category="general")
+
+    assert payload["provider"] == "finnhub"
+    assert payload["data"]
+    assert payload["data"][0]["provider"] == "finnhub"
+    assert payload["data"][0]["url"].startswith("https://example.com/")
 
 
 def _read_json(path):
