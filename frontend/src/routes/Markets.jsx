@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ErrorMessage, LoadingCard } from "../components/State.jsx";
 import { api } from "../services/api.js";
+
+const PAGE_SIZE = 20;
 
 export default function Markets() {
   const [catalog, setCatalog] = useState([]);
@@ -11,6 +13,8 @@ export default function Markets() {
   const [loading, setLoading] = useState(true);
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [error, setError] = useState("");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const loadMoreRef = useRef(null);
 
   useEffect(() => {
     api.catalog()
@@ -43,10 +47,47 @@ export default function Markets() {
     );
   }, [selectedCategory, filter]);
 
+  const visibleStocks = useMemo(
+    () => filteredStocks.slice(0, visibleCount),
+    [filteredStocks, visibleCount]
+  );
+
   useEffect(() => {
-    const symbols = filteredStocks.slice(0, 15).map((stock) => stock.symbol);
-    if (!symbols.length) {
+    setVisibleCount(PAGE_SIZE);
+    setQuoteMap({});
+    setError("");
+  }, [selectedId, filter]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || visibleCount >= filteredStocks.length) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((current) => Math.min(current + PAGE_SIZE, filteredStocks.length));
+        }
+      },
+      { rootMargin: "300px 0px" }
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [filteredStocks.length, visibleCount]);
+
+  useEffect(() => {
+    if (!visibleStocks.length) {
       setQuoteMap({});
+      return;
+    }
+
+    const symbols = visibleStocks
+      .map((stock) => stock.symbol)
+      .filter((symbol) => symbol && !quoteMap[symbol]);
+
+    if (!symbols.length) {
       return;
     }
 
@@ -61,11 +102,11 @@ export default function Markets() {
         for (const quote of payload.data || []) {
           nextQuotes[quote.symbol] = quote;
         }
-        setQuoteMap(nextQuotes);
+        setQuoteMap((current) => ({ ...current, ...nextQuotes }));
       })
       .catch(() => {
         if (!cancelled) {
-          setQuoteMap({});
+          setError("Some live market quotes could not be loaded right now.");
         }
       })
       .finally(() => {
@@ -77,7 +118,7 @@ export default function Markets() {
     return () => {
       cancelled = true;
     };
-  }, [filteredStocks]);
+  }, [visibleStocks, quoteMap]);
 
   return (
     <div className="space-y-6">
@@ -127,7 +168,7 @@ export default function Markets() {
                   <div>
                     <h2 className="text-2xl font-bold">{selectedCategory?.label}</h2>
                     <p className="muted mt-1">
-                      Live quote previews use the same provider stack as the rest of the app: Yahoo Finance first, with Alpha Vantage and Finnhub as fallbacks.
+                      Live quote previews load for the rows currently visible on screen, and more rows stream in as you scroll. Quotes use the same provider stack as the rest of the app: Yahoo Finance first, with Alpha Vantage and Finnhub as fallbacks.
                     </p>
                   </div>
                   <div className="w-full lg:max-w-sm">
@@ -153,7 +194,7 @@ export default function Markets() {
                   <div>Change</div>
                 </div>
                 <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                  {filteredStocks.map((stock, index) => {
+                  {visibleStocks.map((stock, index) => {
                     const quote = quoteMap[stock.symbol];
                     const positive = Number(quote?.changePercent || 0) >= 0;
                     return (
@@ -169,7 +210,7 @@ export default function Markets() {
                         </div>
                         <div className="text-slate-600 dark:text-slate-300">{stock.sector}</div>
                         <div className="font-medium">
-                          {quote ? `${quote.currency || ""} ${Number(quote.price || 0).toFixed(2)}` : (index < 15 && quoteLoading ? "Loading..." : "--")}
+                          {quote ? `${quote.currency || ""} ${Number(quote.price || 0).toFixed(2)}` : (quoteLoading ? "Loading..." : "--")}
                         </div>
                         <div className={positive ? "text-emerald-600" : "text-rose-600"}>
                           {quote ? `${positive ? "+" : ""}${Number(quote.changePercent || 0).toFixed(2)}%` : "--"}
@@ -178,6 +219,14 @@ export default function Markets() {
                     );
                   })}
                 </div>
+                {visibleCount < filteredStocks.length && (
+                  <div
+                    ref={loadMoreRef}
+                    className="border-t border-slate-200 px-5 py-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400"
+                  >
+                    Loading more symbols...
+                  </div>
+                )}
               </div>
             </div>
           </div>
