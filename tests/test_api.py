@@ -194,10 +194,20 @@ class FakeMongoCollection:
             return [{key: value for key, value in doc.items() if key != "_id"} for doc in results]
         return results
 
-    def find_one(self, query):
+    def find_one(self, query, projection=None):
         for doc in self.docs:
             if self._matches(doc, query):
-                return deepcopy(doc)
+                result = deepcopy(doc)
+                if projection:
+                    include_keys = [key for key, value in projection.items() if value and key != "_id"]
+                    if include_keys:
+                        filtered = {key: result.get(key) for key in include_keys}
+                        if projection.get("_id", 1):
+                            filtered["_id"] = result.get("_id")
+                        return filtered
+                    if projection.get("_id") == 0:
+                        result.pop("_id", None)
+                return result
         return None
 
     def delete_many(self, _query):
@@ -217,13 +227,28 @@ class FakeMongoCollection:
             if self._matches(doc, query):
                 next_doc = deepcopy(doc)
                 next_doc.update(deepcopy(update.get("$set", {})))
+                for key, value in deepcopy(update.get("$addToSet", {})).items():
+                    current = list(next_doc.get(key, []))
+                    if value not in current:
+                        current.append(value)
+                    next_doc[key] = current
+                for key, value in deepcopy(update.get("$pull", {})).items():
+                    next_doc[key] = [item for item in next_doc.get(key, []) if item != value]
                 self.docs[index] = next_doc
-                return
+                return FakeUpdateResult(1)
 
         if upsert:
             next_doc = deepcopy(query)
             next_doc.update(deepcopy(update.get("$set", {})))
             self.insert_one(next_doc)
+            return FakeUpdateResult(1)
+
+        return FakeUpdateResult(0)
 
     def _matches(self, doc, query):
         return all(doc.get(key) == value for key, value in query.items())
+
+
+class FakeUpdateResult:
+    def __init__(self, matched_count):
+        self.matched_count = matched_count

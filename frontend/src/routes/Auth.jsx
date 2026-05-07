@@ -84,13 +84,27 @@ export default function Auth() {
         <form className="space-y-4" onSubmit={submit}>
           {mode === "register" && (
             <label className="block">
-              <span className="muted">Display name</span>
-              <input className="input mt-1" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="Display Name" />
+              <span className="muted">Display Name</span>
+              <input
+                className="input mt-1"
+                value={form.displayName}
+                onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+                placeholder="Display Name"
+                name="displayName"
+                autoComplete="name"
+              />
             </label>
           )}
           <label className="block">
             <span className="muted">Username</span>
-            <input className="input mt-1" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="user123" />
+            <input
+              className="input mt-1"
+              value={form.username}
+              onChange={(event) => setForm({ ...form, username: event.target.value })}
+              placeholder="user123"
+              name="username"
+              autoComplete="username"
+            />
           </label>
           <label className="block">
             <span className="muted">Password</span>
@@ -101,6 +115,8 @@ export default function Auth() {
                 value={form.password}
                 onChange={(event) => setForm({ ...form, password: event.target.value })}
                 placeholder="At least 8 characters"
+                name="password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
               />
               <button
                 type="button"

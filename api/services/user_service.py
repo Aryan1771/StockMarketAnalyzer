@@ -28,10 +28,6 @@ class UserService:
             raise ValueError("Username must be at least 3 characters")
         self._validate_password(password)
 
-        users = self._load_users()
-        if self._find_user(users, username):
-            raise ValueError("Username already exists")
-
         user = {
             "username": username,
             "displayName": display_name or username,
@@ -40,6 +36,17 @@ class UserService:
             "preferences": DEFAULT_PREFERENCES.copy(),
             "watchlist": [],
         }
+
+        if db_service.enabled:
+            collection = db_service.users()
+            if collection.find_one({"username": username}):
+                raise ValueError("Username already exists")
+            collection.insert_one(user)
+            return self._public_user(user)
+
+        users = self._load_users()
+        if self._find_user(users, username):
+            raise ValueError("Username already exists")
         users.append(user)
         self._save_users(users)
         return self._public_user(user)
@@ -102,18 +109,29 @@ class UserService:
 
     def authenticate(self, username, password):
         username = self._normalize_username(username)
-        user = self._find_user(self._load_users(), username)
+        if db_service.enabled:
+            user = db_service.users().find_one({"username": username}, {"_id": 0})
+        else:
+            user = self._find_user(self._load_users(), username)
         if not user or user.get("passwordHash") != self._hash_password(username, password or ""):
             raise ValueError("Invalid username or password")
         return self._public_user(user)
 
     def get_user(self, username):
-        user = self._find_user(self._load_users(), self._normalize_username(username))
+        username = self._normalize_username(username)
+        if db_service.enabled:
+            user = db_service.users().find_one({"username": username}, {"_id": 0})
+        else:
+            user = self._find_user(self._load_users(), username)
         return self._public_user(user) if user else None
 
     def get_preferences(self, username=None):
         if username:
-            user = self._find_user(self._load_users(), self._normalize_username(username))
+            username = self._normalize_username(username)
+            if db_service.enabled:
+                user = db_service.users().find_one({"username": username}, {"_id": 0})
+            else:
+                user = self._find_user(self._load_users(), username)
             if not user:
                 return DEFAULT_PREFERENCES.copy()
             return {**DEFAULT_PREFERENCES, **(user.get("preferences") or {})}
@@ -126,12 +144,18 @@ class UserService:
         allowed = {"theme", "defaultRange", "refreshInterval"}
         next_value = {**current, **{key: value for key, value in (updates or {}).items() if key in allowed}}
         if username:
-            users = self._load_users()
-            user = self._find_user(users, self._normalize_username(username))
-            if not user:
-                raise ValueError("User not found")
-            user["preferences"] = next_value
-            self._save_users(users)
+            username = self._normalize_username(username)
+            if db_service.enabled:
+                result = db_service.users().update_one({"username": username}, {"$set": {"preferences": next_value}})
+                if not result.matched_count:
+                    raise ValueError("User not found")
+            else:
+                users = self._load_users()
+                user = self._find_user(users, username)
+                if not user:
+                    raise ValueError("User not found")
+                user["preferences"] = next_value
+                self._save_users(users)
         elif db_service.enabled:
             return next_value
         else:
@@ -139,10 +163,23 @@ class UserService:
         return next_value
 
     def get_watchlist(self, username):
+        username = self._normalize_username(username)
+        if db_service.enabled:
+            user = db_service.users().find_one({"username": username}, {"_id": 0, "watchlist": 1})
+            if not user:
+                raise ValueError("User not found")
+            return user.get("watchlist", [])
         user = self._require_user(username)
         return user.get("watchlist", [])
 
     def add_watchlist(self, username, symbol):
+        username = self._normalize_username(username)
+        if db_service.enabled:
+            result = db_service.users().update_one({"username": username}, {"$addToSet": {"watchlist": symbol}})
+            if not result.matched_count:
+                raise ValueError("User not found")
+            return self.get_watchlist(username)
+
         user = self._require_user(username)
         watchlist = user.setdefault("watchlist", [])
         if symbol not in watchlist:
@@ -151,6 +188,13 @@ class UserService:
         return watchlist
 
     def remove_watchlist(self, username, symbol):
+        username = self._normalize_username(username)
+        if db_service.enabled:
+            result = db_service.users().update_one({"username": username}, {"$pull": {"watchlist": symbol}})
+            if not result.matched_count:
+                raise ValueError("User not found")
+            return self.get_watchlist(username)
+
         user = self._require_user(username)
         user["watchlist"] = [item for item in user.get("watchlist", []) if item != symbol]
         self._persist_user(user)
