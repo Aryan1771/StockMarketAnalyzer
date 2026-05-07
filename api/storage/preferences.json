@@ -1,0 +1,5 @@
+{
+  "theme": "dark",
+  "defaultRange": "10d",
+  "refreshInterval": 60
+}
