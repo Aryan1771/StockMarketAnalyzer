@@ -4,6 +4,7 @@ import { ErrorMessage, LoadingCard } from "../components/State.jsx";
 import { api } from "../services/api.js";
 
 const PAGE_SIZE = 20;
+const QUOTE_BUFFER = 5;
 
 export default function Markets() {
   const [catalog, setCatalog] = useState([]);
@@ -14,7 +15,10 @@ export default function Markets() {
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [error, setError] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [activeRange, setActiveRange] = useState({ start: 0, end: PAGE_SIZE - 1 });
   const loadMoreRef = useRef(null);
+  const rowRefs = useRef(new Map());
+  const visibleIndicesRef = useRef(new Set());
 
   useEffect(() => {
     api.catalog()
@@ -56,6 +60,8 @@ export default function Markets() {
     setVisibleCount(PAGE_SIZE);
     setQuoteMap({});
     setError("");
+    visibleIndicesRef.current = new Set();
+    setActiveRange({ start: 0, end: PAGE_SIZE - 1 });
   }, [selectedId, filter]);
 
   useEffect(() => {
@@ -83,26 +89,91 @@ export default function Markets() {
       return;
     }
 
-    const symbols = visibleStocks
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const index = Number(entry.target.getAttribute("data-index"));
+          if (Number.isNaN(index)) {
+            continue;
+          }
+          if (entry.isIntersecting) {
+            visibleIndicesRef.current.add(index);
+          } else {
+            visibleIndicesRef.current.delete(index);
+          }
+        }
+
+        const indices = [...visibleIndicesRef.current].sort((a, b) => a - b);
+        if (indices.length) {
+          setActiveRange({ start: indices[0], end: indices[indices.length - 1] });
+        }
+      },
+      {
+        threshold: 0.2,
+        rootMargin: "120px 0px",
+      }
+    );
+
+    for (const [index, node] of rowRefs.current.entries()) {
+      if (index < visibleStocks.length && node) {
+        observer.observe(node);
+      }
+    }
+
+    return () => observer.disconnect();
+  }, [visibleStocks]);
+
+  useEffect(() => {
+    if (!visibleStocks.length) {
+      setQuoteMap({});
+      return;
+    }
+
+    const bufferStart = Math.max(0, activeRange.start - QUOTE_BUFFER);
+    const bufferEnd = Math.min(visibleStocks.length - 1, activeRange.end + QUOTE_BUFFER);
+    const windowStocks = visibleStocks.slice(bufferStart, bufferEnd + 1);
+    const windowSymbols = new Set(windowStocks.map((stock) => stock.symbol).filter(Boolean));
+
+    setQuoteMap((current) => {
+      const next = {};
+      for (const [symbol, quote] of Object.entries(current)) {
+        if (windowSymbols.has(symbol)) {
+          next[symbol] = quote;
+        }
+      }
+      return next;
+    });
+
+    const symbolsToFetch = windowStocks
       .map((stock) => stock.symbol)
       .filter((symbol) => symbol && !quoteMap[symbol]);
 
-    if (!symbols.length) {
+    if (!symbolsToFetch.length) {
       return;
     }
 
     let cancelled = false;
     setQuoteLoading(true);
-    api.compare(symbols)
+    api.compare(symbolsToFetch)
       .then((payload) => {
         if (cancelled) {
           return;
         }
         const nextQuotes = {};
         for (const quote of payload.data || []) {
-          nextQuotes[quote.symbol] = quote;
+          if (windowSymbols.has(quote.symbol)) {
+            nextQuotes[quote.symbol] = quote;
+          }
         }
-        setQuoteMap((current) => ({ ...current, ...nextQuotes }));
+        setQuoteMap((current) => {
+          const trimmed = {};
+          for (const [symbol, quote] of Object.entries(current)) {
+            if (windowSymbols.has(symbol)) {
+              trimmed[symbol] = quote;
+            }
+          }
+          return { ...trimmed, ...nextQuotes };
+        });
       })
       .catch(() => {
         if (!cancelled) {
@@ -118,7 +189,7 @@ export default function Markets() {
     return () => {
       cancelled = true;
     };
-  }, [visibleStocks, quoteMap]);
+  }, [activeRange, visibleStocks, quoteMap]);
 
   return (
     <div className="space-y-6">
@@ -168,7 +239,7 @@ export default function Markets() {
                   <div>
                     <h2 className="text-2xl font-bold">{selectedCategory?.label}</h2>
                     <p className="muted mt-1">
-                      Live quote previews load for the rows currently visible on screen, and more rows stream in as you scroll. Quotes use the same provider stack as the rest of the app: Yahoo Finance first, with Alpha Vantage and Finnhub as fallbacks.
+                      Live quote previews stay focused on the rows around your viewport: what you can see now, plus a small buffer above and below for smoother scrolling.
                     </p>
                   </div>
                   <div className="w-full lg:max-w-sm">
@@ -201,6 +272,14 @@ export default function Markets() {
                       <Link
                         key={`${stock.symbol}-${index}`}
                         to={`/stocks/${encodeURIComponent(stock.symbol)}`}
+                        data-index={index}
+                        ref={(node) => {
+                          if (node) {
+                            rowRefs.current.set(index, node);
+                          } else {
+                            rowRefs.current.delete(index);
+                          }
+                        }}
                         className="grid grid-cols-[1.1fr_2fr_1.2fr_1fr_1fr] gap-3 px-5 py-3 text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
                       >
                         <div className="font-semibold">{stock.displaySymbol || stock.symbol}</div>
