@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import json
 import uuid
+from copy import deepcopy
 
 ROOT = Path(__file__).resolve().parents[1]
 API_DIR = ROOT / "api"
@@ -10,6 +11,7 @@ sys.path.insert(0, str(API_DIR))
 from app import create_app
 from config import PREFERENCES_FILE, USERS_FILE, WATCHLIST_FILE
 from services.dashboard_service import dashboard_service
+from services.user_service import db_service as user_db_service
 
 
 def test_health():
@@ -102,6 +104,48 @@ def test_register_login_logout_flow():
         _write_json(USERS_FILE, original_users)
 
 
+def test_logged_in_data_persists_through_mongodb_path(monkeypatch):
+    original_enabled = user_db_service.enabled
+    original_users_method = user_db_service.users
+    fake_collection = FakeMongoCollection()
+
+    monkeypatch.setattr(user_db_service, "enabled", True)
+    monkeypatch.setattr(user_db_service, "users", lambda: fake_collection)
+
+    app = create_app()
+    client = app.test_client()
+    username = f"user_{uuid.uuid4().hex[:8]}"
+
+    try:
+        register_response = client.post("/api/user/register", json={
+            "username": username,
+            "password": "Secret12",
+            "displayName": "Mongo Demo User",
+        })
+        assert register_response.status_code == 201
+
+        document = fake_collection.find_one({"username": username})
+        assert document is not None
+        assert document["displayName"] == "Mongo Demo User"
+        assert document["passwordHash"] != "Secret12"
+        assert document["preferences"]["theme"] == "dark"
+        assert document["watchlist"] == []
+
+        preferences_response = client.put("/api/user/preferences", json={"theme": "light", "defaultRange": "3mo"})
+        assert preferences_response.status_code == 200
+
+        watchlist_response = client.post("/api/watchlist", json={"symbol": "IBM"})
+        assert watchlist_response.status_code == 201
+
+        document = fake_collection.find_one({"username": username})
+        assert document["preferences"]["theme"] == "light"
+        assert document["preferences"]["defaultRange"] == "3mo"
+        assert "IBM" in document["watchlist"]
+    finally:
+        monkeypatch.setattr(user_db_service, "enabled", original_enabled)
+        monkeypatch.setattr(user_db_service, "users", original_users_method)
+
+
 def test_market_catalog_route():
     app = create_app()
     client = app.test_client()
@@ -137,3 +181,49 @@ def _read_json(path):
 def _write_json(path, payload):
     with Path(path).open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2)
+
+
+class FakeMongoCollection:
+    def __init__(self):
+        self.docs = []
+
+    def find(self, query=None, projection=None):
+        query = query or {}
+        results = [deepcopy(doc) for doc in self.docs if self._matches(doc, query)]
+        if projection and projection.get("_id") == 0:
+            return [{key: value for key, value in doc.items() if key != "_id"} for doc in results]
+        return results
+
+    def find_one(self, query):
+        for doc in self.docs:
+            if self._matches(doc, query):
+                return deepcopy(doc)
+        return None
+
+    def delete_many(self, _query):
+        self.docs = []
+
+    def insert_many(self, docs):
+        for doc in docs:
+            self.insert_one(doc)
+
+    def insert_one(self, doc):
+        next_doc = deepcopy(doc)
+        next_doc.setdefault("_id", uuid.uuid4().hex)
+        self.docs.append(next_doc)
+
+    def update_one(self, query, update, upsert=False):
+        for index, doc in enumerate(self.docs):
+            if self._matches(doc, query):
+                next_doc = deepcopy(doc)
+                next_doc.update(deepcopy(update.get("$set", {})))
+                self.docs[index] = next_doc
+                return
+
+        if upsert:
+            next_doc = deepcopy(query)
+            next_doc.update(deepcopy(update.get("$set", {})))
+            self.insert_one(next_doc)
+
+    def _matches(self, doc, query):
+        return all(doc.get(key) == value for key, value in query.items())

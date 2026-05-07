@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ErrorMessage } from "../components/State.jsx";
@@ -11,6 +11,7 @@ export default function Auth() {
   const [form, setForm] = useState({ username: "", password: "", displayName: "" });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const passwordChecks = useMemo(() => ([
     { label: "At least 8 characters", valid: form.password.length >= 8 },
@@ -84,7 +85,7 @@ export default function Auth() {
           {mode === "register" && (
             <label className="block">
               <span className="muted">Display name</span>
-              <input className="input mt-1" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="Aryan" />
+              <input className="input mt-1" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="Display Name" />
             </label>
           )}
           <label className="block">
@@ -93,7 +94,24 @@ export default function Auth() {
           </label>
           <label className="block">
             <span className="muted">Password</span>
-            <input className="input mt-1" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="At least 8 characters" />
+            <div className="relative mt-1">
+              <input
+                className="input pr-12"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
+                placeholder="At least 8 characters"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 inline-flex items-center px-3 text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                onClick={() => setShowPassword((value) => !value)}
+                title={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </label>
           {mode === "register" && (
             <div className="grid gap-2 rounded-lg border border-slate-200 p-4 text-sm dark:border-slate-700">
