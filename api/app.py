@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 from flask import Flask, jsonify
 from flask_cors import CORS
@@ -43,6 +44,14 @@ def create_app():
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok"})
+
+    @app.route("/ping")
+    def ping():
+        return jsonify({
+            "ok": True,
+            "service": "stockmarketanalyzer-backend",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
 
     @app.errorhandler(404)
     def not_found(_error):
