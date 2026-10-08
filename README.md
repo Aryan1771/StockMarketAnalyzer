@@ -1,6 +1,6 @@
 # StockMarketAnalyzer 2.0
 
-Modern full-stack stock market dashboard with a Flask API, React/Vite frontend, live market data, news aggregation, account-based watchlists, saved preferences, MongoDB persistence, and a C++-inspired analysis pipeline with a production-safe Python fallback.
+A full-stack stock market dashboard with a Flask API, React/Vite frontend, provider-supplied market data, news aggregation, account-based watchlists, saved preferences, MongoDB persistence, and a C++ analysis path with a Python fallback.
 
 ## Features
 
@@ -43,7 +43,7 @@ frontend/
   package.json
 .github/
   workflows/
-render.yaml
+render.y
 requirements.txt
 ```
 
@@ -230,7 +230,7 @@ This means deployed analysis still returns useful values like:
 
 instead of failing outright on Linux.
 
-## Recommended free-tier setup
+## Deployment configuration
 
 - Frontend: Vercel
 - Backend: Render
@@ -261,8 +261,8 @@ cd api && gunicorn "app:create_app()"
 
 The repo includes:
 
-- [C:\Users\aryan\Documents\GitHub\StockMArketAnalyzer2.0\render.yaml](C:\Users\aryan\Documents\GitHub\StockMArketAnalyzer2.0\render.yaml)
-- [C:\Users\aryan\Documents\GitHub\StockMArketAnalyzer2.0\frontend\vercel.json](C:\Users\aryan\Documents\GitHub\StockMArketAnalyzer2.0\frontend\vercel.json)
+- [render.y](render.y)
+- [frontend/vercel.json](frontend/vercel.json)
 
 ### Production environment example
 
@@ -296,7 +296,7 @@ VITE_API_BASE_URL=https://your-render-service.onrender.com
 
 The repository includes:
 
-- [C:\Users\aryan\Documents\GitHub\StockMArketAnalyzer2.0\.github\workflows\keep-render-awake.yml](C:\Users\aryan\Documents\GitHub\StockMArketAnalyzer2.0\.github\workflows\keep-render-awake.yml)
+- [Health-check workflow](.github/workflows/keep-render-awake.yml)
 
 It pings the backend health endpoint every 10 minutes to reduce cold-start delays on Render free tier.
 
@@ -312,7 +312,7 @@ Optional GitHub repository variable:
 RENDER_HEALTHCHECK_URL
 ```
 
-Note: keeping a free Render service warm continuously uses most of the monthly free instance hours.
+Scheduled health requests can consume hosting quotas and are not an availability guarantee. Check the hosting plan and disable the workflow if it is not needed.
 
 ## Testing
 
@@ -341,3 +341,11 @@ The current suite covers:
 - If deployed data or analysis looks stale after a push, verify both:
   - Vercel redeployed the frontend
   - Render redeployed the backend
+
+## Data limitations
+
+Quotes and news depend on external providers and may be delayed, cached, or unavailable. Analysis outputs are computed indicators, not validated forecasts.
+
+## License
+
+See [LICENSE](LICENSE) for the GNU GPL v3 terms.
